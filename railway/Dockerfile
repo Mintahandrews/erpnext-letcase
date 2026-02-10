@@ -74,4 +74,4 @@ COPY --chown=$systemUser --chmod=0755 /railway/railway-cmd.sh /usr/local/bin/rai
 ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]
 CMD ["/usr/local/bin/railway-cmd.sh"]
 
-EXPOSE ${PORT}
+EXPOSE 80
