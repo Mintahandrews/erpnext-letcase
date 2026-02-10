@@ -6,6 +6,49 @@ export PORT="${PORT:-80}"
 echo "-> [DEBUG] PORT=${PORT}"
 echo "-> [DEBUG] RFP_DOMAIN_NAME=${RFP_DOMAIN_NAME}"
 echo "-> [DEBUG] systemUser=${systemUser}"
+
+cd /home/frappe/bench
+
+###############################################
+# First-time setup: auto-detect and create site
+###############################################
+SITE_DIR="/home/frappe/bench/sites/${RFP_DOMAIN_NAME}"
+SETUP_MARKER="/home/frappe/bench/sites/.setup_complete"
+
+if [ ! -f "$SETUP_MARKER" ]; then
+    echo "============================================="
+    echo "-> FIRST TIME SETUP DETECTED"
+    echo "============================================="
+
+    echo "-> Creating common_site_config.json"
+    su frappe -c "echo '{}' > /home/frappe/bench/sites/common_site_config.json"
+
+    echo "-> Creating new site: ${RFP_DOMAIN_NAME}"
+    su frappe -c "bench new-site ${RFP_DOMAIN_NAME} \
+        --admin-password ${RFP_SITE_ADMIN_PASSWORD} \
+        --no-mariadb-socket \
+        --db-root-password ${RFP_DB_ROOT_PASSWORD} \
+        --install-app erpnext" 2>&1
+
+    echo "-> Setting default site"
+    su frappe -c "bench use ${RFP_DOMAIN_NAME}" 2>&1
+
+    echo "-> Enabling scheduler"
+    su frappe -c "bench enable-scheduler" 2>&1
+
+    echo "-> Marking setup as complete"
+    su frappe -c "touch ${SETUP_MARKER}"
+
+    echo "============================================="
+    echo "-> FIRST TIME SETUP COMPLETE"
+    echo "============================================="
+else
+    echo "-> Site already set up, skipping first-time setup"
+fi
+
+###############################################
+# Normal startup
+###############################################
 echo "-> [DEBUG] Listing sites directory:"
 ls -la /home/frappe/bench/sites/ 2>&1 || echo "-> WARN: Cannot list sites dir"
 
