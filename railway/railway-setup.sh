@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+BENCH_CMD="/home/frappe/.local/bin/bench"
+
 # -> Run entrypoint
 # somehow when specify custom cmd in railway,
 # it doesn't run entrypoint first, so we need to run it here.
@@ -11,10 +13,10 @@ su frappe -c "echo '{}' > /home/frappe/bench/sites/common_site_config.json"
 
 echo "-> Create new site with ERPNext"
 cd /home/frappe/bench
-su frappe -c "bench new-site ${RFP_DOMAIN_NAME} --admin-password ${RFP_SITE_ADMIN_PASSWORD} --no-mariadb-socket --db-root-password ${RFP_DB_ROOT_PASSWORD} --install-app erpnext"
-su frappe -c "bench use ${RFP_DOMAIN_NAME}"
+su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} new-site ${RFP_DOMAIN_NAME} --admin-password ${RFP_SITE_ADMIN_PASSWORD} --no-mariadb-socket --db-root-password ${RFP_DB_ROOT_PASSWORD} --install-app erpnext"
+su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} use ${RFP_DOMAIN_NAME}"
 
 echo "-> Enable scheduler"
-su frappe -c "bench enable-scheduler"
+su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} enable-scheduler"
 
 echo "-> Setup complete! Remove the start command override, set port to 80, and redeploy."

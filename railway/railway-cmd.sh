@@ -3,16 +3,19 @@
 # Default PORT to 80 if Railway hasn't set it
 export PORT="${PORT:-80}"
 
+# Full path to bench CLI (installed in frappe user's pip)
+BENCH_CMD="/home/frappe/.local/bin/bench"
+
 echo "-> [DEBUG] PORT=${PORT}"
 echo "-> [DEBUG] RFP_DOMAIN_NAME=${RFP_DOMAIN_NAME}"
 echo "-> [DEBUG] systemUser=${systemUser}"
+echo "-> [DEBUG] bench path: $(ls -la ${BENCH_CMD} 2>&1)"
 
 cd /home/frappe/bench
 
 ###############################################
 # First-time setup: auto-detect and create site
 ###############################################
-SITE_DIR="/home/frappe/bench/sites/${RFP_DOMAIN_NAME}"
 SETUP_MARKER="/home/frappe/bench/sites/.setup_complete"
 
 if [ ! -f "$SETUP_MARKER" ]; then
@@ -24,17 +27,17 @@ if [ ! -f "$SETUP_MARKER" ]; then
     su frappe -c "echo '{}' > /home/frappe/bench/sites/common_site_config.json"
 
     echo "-> Creating new site: ${RFP_DOMAIN_NAME}"
-    su frappe -c "bench new-site ${RFP_DOMAIN_NAME} \
+    su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} new-site ${RFP_DOMAIN_NAME} \
         --admin-password ${RFP_SITE_ADMIN_PASSWORD} \
         --no-mariadb-socket \
         --db-root-password ${RFP_DB_ROOT_PASSWORD} \
         --install-app erpnext" 2>&1
 
     echo "-> Setting default site"
-    su frappe -c "bench use ${RFP_DOMAIN_NAME}" 2>&1
+    su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} use ${RFP_DOMAIN_NAME}" 2>&1
 
     echo "-> Enabling scheduler"
-    su frappe -c "bench enable-scheduler" 2>&1
+    su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} enable-scheduler" 2>&1
 
     echo "-> Marking setup as complete"
     su frappe -c "touch ${SETUP_MARKER}"
@@ -53,7 +56,7 @@ echo "-> [DEBUG] Listing sites directory:"
 ls -la /home/frappe/bench/sites/ 2>&1 || echo "-> WARN: Cannot list sites dir"
 
 echo "-> Clearing cache"
-su frappe -c "bench execute frappe.cache_manager.clear_global_cache" 2>&1 || echo "-> WARN: Cache clear failed, continuing..."
+su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} execute frappe.cache_manager.clear_global_cache" 2>&1 || echo "-> WARN: Cache clear failed, continuing..."
 
 echo "-> Bursting env into config"
 envsubst '$RFP_DOMAIN_NAME,$PORT' < /home/$systemUser/temp_nginx.conf > /etc/nginx/conf.d/default.conf
