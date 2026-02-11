@@ -6,10 +6,20 @@ export PORT="${PORT:-80}"
 # Full path to bench CLI (installed in frappe user's pip)
 BENCH_CMD="/home/frappe/.local/bin/bench"
 
+# Railway private networking defaults (IPv6)
+# These match the service names from the Railway ERPNext template
+export RFP_DB_HOST="${RFP_DB_HOST:-mariadb.railway.internal}"
+export RFP_REDIS_CACHE_URL="${RFP_REDIS_CACHE_URL:-redis://redis-cache.railway.internal:6379}"
+export RFP_REDIS_QUEUE_URL="${RFP_REDIS_QUEUE_URL:-redis://redis-queue.railway.internal:6379}"
+export RFP_REDIS_SOCKETIO_URL="${RFP_REDIS_SOCKETIO_URL:-redis://redis-queue.railway.internal:6379}"
+
 echo "-> [DEBUG] PORT=${PORT}"
 echo "-> [DEBUG] RFP_DOMAIN_NAME=${RFP_DOMAIN_NAME}"
+echo "-> [DEBUG] RFP_DB_HOST=${RFP_DB_HOST}"
+echo "-> [DEBUG] RFP_REDIS_CACHE_URL=${RFP_REDIS_CACHE_URL}"
+echo "-> [DEBUG] RFP_REDIS_QUEUE_URL=${RFP_REDIS_QUEUE_URL}"
 echo "-> [DEBUG] systemUser=${systemUser}"
-echo "-> [DEBUG] bench path: $(ls -la ${BENCH_CMD} 2>&1)"
+echo "-> [DEBUG] bench exists: $(ls -la ${BENCH_CMD} 2>&1)"
 
 cd /home/frappe/bench
 
@@ -23,8 +33,21 @@ if [ ! -f "$SETUP_MARKER" ]; then
     echo "-> FIRST TIME SETUP DETECTED"
     echo "============================================="
 
-    echo "-> Creating common_site_config.json"
-    su frappe -c "echo '{}' > /home/frappe/bench/sites/common_site_config.json"
+    echo "-> Creating common_site_config.json with DB and Redis connection info"
+    cat > /tmp/common_site_config.json << EOF
+{
+    "db_host": "${RFP_DB_HOST}",
+    "db_port": 3306,
+    "redis_cache": "${RFP_REDIS_CACHE_URL}",
+    "redis_queue": "${RFP_REDIS_QUEUE_URL}",
+    "redis_socketio": "${RFP_REDIS_SOCKETIO_URL}"
+}
+EOF
+    cp /tmp/common_site_config.json /home/frappe/bench/sites/common_site_config.json
+    chown frappe:frappe /home/frappe/bench/sites/common_site_config.json
+
+    echo "-> common_site_config.json contents:"
+    cat /home/frappe/bench/sites/common_site_config.json
 
     echo "-> Creating new site: ${RFP_DOMAIN_NAME}"
     su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} new-site ${RFP_DOMAIN_NAME} \
@@ -33,20 +56,37 @@ if [ ! -f "$SETUP_MARKER" ]; then
         --db-root-password ${RFP_DB_ROOT_PASSWORD} \
         --install-app erpnext" 2>&1
 
-    echo "-> Setting default site"
-    su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} use ${RFP_DOMAIN_NAME}" 2>&1
+    if [ $? -eq 0 ]; then
+        echo "-> Setting default site"
+        su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} use ${RFP_DOMAIN_NAME}" 2>&1
 
-    echo "-> Enabling scheduler"
-    su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} enable-scheduler" 2>&1
+        echo "-> Enabling scheduler"
+        su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} enable-scheduler" 2>&1
 
-    echo "-> Marking setup as complete"
-    su frappe -c "touch ${SETUP_MARKER}"
+        echo "-> Marking setup as complete"
+        su frappe -c "touch ${SETUP_MARKER}"
 
-    echo "============================================="
-    echo "-> FIRST TIME SETUP COMPLETE"
-    echo "============================================="
+        echo "============================================="
+        echo "-> FIRST TIME SETUP COMPLETE"
+        echo "============================================="
+    else
+        echo "-> ERROR: Site creation failed! Check DB connectivity and env vars."
+        echo "-> Will continue to start nginx/supervisor anyway for debugging."
+    fi
 else
     echo "-> Site already set up, skipping first-time setup"
+    echo "-> Updating common_site_config.json with latest connection info"
+    cat > /tmp/common_site_config.json << EOF
+{
+    "db_host": "${RFP_DB_HOST}",
+    "db_port": 3306,
+    "redis_cache": "${RFP_REDIS_CACHE_URL}",
+    "redis_queue": "${RFP_REDIS_QUEUE_URL}",
+    "redis_socketio": "${RFP_REDIS_SOCKETIO_URL}"
+}
+EOF
+    cp /tmp/common_site_config.json /home/frappe/bench/sites/common_site_config.json
+    chown frappe:frappe /home/frappe/bench/sites/common_site_config.json
 fi
 
 ###############################################
