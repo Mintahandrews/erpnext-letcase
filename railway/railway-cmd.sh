@@ -51,8 +51,9 @@ EOF
 
     echo "-> Creating new site: ${RFP_DOMAIN_NAME}"
     su frappe -c "cd /home/frappe/bench && ${BENCH_CMD} new-site ${RFP_DOMAIN_NAME} \
+        --force \
         --admin-password ${RFP_SITE_ADMIN_PASSWORD} \
-        --no-mariadb-socket \
+        --mariadb-user-host-login-scope='%' \
         --db-root-password ${RFP_DB_ROOT_PASSWORD} \
         --install-app erpnext" 2>&1
 
